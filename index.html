@@ -1,1 +1,236 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Прыгающие шарики</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
 
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1b2735 0%, #090a0f 100%);
+      color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    h1 {
+      margin: 1rem 0 0.25rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    p {
+      margin: 0 0 1rem;
+      font-size: 0.95rem;
+      opacity: 0.8;
+      text-align: center;
+      max-width: 40rem;
+    }
+
+    #canvas-container {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+
+    canvas {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.75rem;
+      box-shadow: 0 1.5rem 3rem rgba(0, 0, 0, 0.35);
+      max-width: 100%;
+    }
+
+    button {
+      margin-bottom: 1rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg, #ff8a00, #da1b60);
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0.75rem 1.5rem rgba(218, 27, 96, 0.35);
+    }
+  </style>
+</head>
+<body>
+  <h1>Гравитация шариков</h1>
+  <p>Шарики падают под действием гравитации, отскакивая от пола с потерей энергии и сталкиваясь друг с другом.
+    Нажмите на кнопку, чтобы добавить новый шарик.</p>
+  <button id="add-ball">Добавить шарик</button>
+  <div id="canvas-container">
+    <canvas id="scene" width="800" height="500"></canvas>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const addBallBtn = document.getElementById('add-ball');
+
+    const GRAVITY = 0.35;
+    const RESTITUTION = 0.7; // коэффициент упругости при ударе об пол
+    const FRICTION = 0.995; // лёгкое затухание горизонтальной скорости
+
+    const colors = ['#ff8a00', '#da1b60', '#1fe4f5', '#82ffa1', '#ffc93c', '#a05195'];
+
+    class Ball {
+      constructor(x, y, radius = 20) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.mass = radius * radius * Math.PI;
+        this.vx = (Math.random() - 0.5) * 8;
+        this.vy = (Math.random() - 0.5) * 8;
+        this.color = colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      draw(ctx) {
+        ctx.beginPath();
+        ctx.fillStyle = this.color;
+        const gradient = ctx.createRadialGradient(
+          this.x - this.radius * 0.4,
+          this.y - this.radius * 0.4,
+          this.radius * 0.1,
+          this.x,
+          this.y,
+          this.radius
+        );
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+        gradient.addColorStop(1, this.color);
+        ctx.fillStyle = gradient;
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      update() {
+        this.vy += GRAVITY;
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // столкновение с границами
+        if (this.x - this.radius < 0) {
+          this.x = this.radius;
+          this.vx = -this.vx * RESTITUTION;
+        } else if (this.x + this.radius > canvas.width) {
+          this.x = canvas.width - this.radius;
+          this.vx = -this.vx * RESTITUTION;
+        }
+
+        if (this.y + this.radius > canvas.height) {
+          this.y = canvas.height - this.radius;
+          this.vy = -this.vy * RESTITUTION;
+          this.vx *= FRICTION;
+          // остановка, если скорость почти нулевая
+          if (Math.abs(this.vy) < 0.05) {
+            this.vy = 0;
+          }
+        } else if (this.y - this.radius < 0) {
+          this.y = this.radius;
+          this.vy = -this.vy * RESTITUTION;
+        }
+      }
+    }
+
+    const balls = [];
+
+    function addBall(x = canvas.width / 2, y = 50, radius = 20 + Math.random() * 15) {
+      // предотвращаем появление шарика внутри другого
+      for (const ball of balls) {
+        const dx = x - ball.x;
+        const dy = y - ball.y;
+        const minDist = radius + ball.radius;
+        if (dx * dx + dy * dy < minDist * minDist) {
+          return addBall(x + minDist, y, radius);
+        }
+      }
+      balls.push(new Ball(x, y, radius));
+    }
+
+    addBall(canvas.width / 2, canvas.height / 3, 30);
+    addBall(canvas.width / 2 + 80, canvas.height / 4, 22);
+
+    addBallBtn.addEventListener('click', () => {
+      addBall(50 + Math.random() * (canvas.width - 100), 40);
+    });
+
+    canvas.addEventListener('click', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      addBall(x, y);
+    });
+
+    function resolveCollision(ballA, ballB) {
+      const dx = ballB.x - ballA.x;
+      const dy = ballB.y - ballA.y;
+      const distance = Math.hypot(dx, dy);
+      const minDist = ballA.radius + ballB.radius;
+
+      if (distance === 0 || distance >= minDist) return;
+
+      // нормализованный вектор нормали
+      const nx = dx / distance;
+      const ny = dy / distance;
+
+      // проекция скоростей на нормаль
+      const p = (ballA.vx * nx + ballA.vy * ny) - (ballB.vx * nx + ballB.vy * ny);
+
+      if (p > 0) return;
+
+      const massSum = ballA.mass + ballB.mass;
+      const impulse = (2 * p) / massSum;
+
+      // обновление скоростей (эластичное столкновение)
+      ballA.vx -= impulse * ballB.mass * nx;
+      ballA.vy -= impulse * ballB.mass * ny;
+      ballB.vx += impulse * ballA.mass * nx;
+      ballB.vy += impulse * ballA.mass * ny;
+
+      // минимальный перенос для устранения проникновения
+      const overlap = minDist - distance;
+      const correction = overlap / 2;
+      ballA.x -= correction * nx;
+      ballA.y -= correction * ny;
+      ballB.x += correction * nx;
+      ballB.y += correction * ny;
+    }
+
+    function update() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < balls.length; i++) {
+        const ball = balls[i];
+        ball.update();
+        for (let j = i + 1; j < balls.length; j++) {
+          resolveCollision(ball, balls[j]);
+        }
+        ball.draw(ctx);
+      }
+
+      requestAnimationFrame(update);
+    }
+
+    update();
+  </script>
+</body>
+</html>
